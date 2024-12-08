@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"fmt"
@@ -6,18 +6,17 @@ import (
 	"os"
 
 	"github.com/Ashish9738/go-ciaos/ciaos"
-	"github.com/Ashish9738/go-ciaos/config"
 )
 
-func testConfig() config.Config {
-	return config.Config{
+func GetConfig() ciaos.Config {
+	return ciaos.Config{
 		APIURL:        "http://localhost:8080",
 		UserId:        "45678",
 		UserAccessKey: "testaccesskey",
 	}
 }
 
-func readFilesFromDirectory(folderPath string) ([][]byte, error) {
+func ReadFilesFromDir(folderPath string) ([][]byte, error) {
 	var byteStrings [][]byte
 
 	files, err := os.ReadDir(folderPath)
@@ -38,20 +37,23 @@ func readFilesFromDirectory(folderPath string) ([][]byte, error) {
 	return byteStrings, nil
 }
 
-func testPost() {
-	client, err := ciaos.Ciaos(testConfig())
+func TestPutBinary() {
+	client, err := ciaos.Ciaos(GetConfig())
+
 	if err != nil {
 		log.Fatalf("Error initializing Ciaos client: %v", err)
 	}
 
 	folderPath := "/home/ash/Pictures/wallpaper"
 
-	byteStrings, err := readFilesFromDirectory(folderPath)
+	byteStrings, err := ReadFilesFromDir(folderPath)
+	fmt.Println("byte strings", byteStrings)
+	fmt.Println("client", client)
 	if err != nil {
 		log.Fatalf("Error reading files from directory: %v", err)
 	}
 
-	response, err := client.PutBinary("abcd", byteStrings)
+	response, err := client.PutBinary("jsdusv", byteStrings)
 	if err != nil {
 		log.Fatalf("Error during upload: %v", err)
 	}
@@ -59,6 +61,6 @@ func testPost() {
 	fmt.Println("Upload successful:", response.Status)
 }
 
-func main() {
-	testPost()
-}
+// func test() {
+// 	TestPutBinary()
+// }

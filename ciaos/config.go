@@ -1,4 +1,4 @@
-package config
+package ciaos
 
 type Config struct {
 	APIURL        string
