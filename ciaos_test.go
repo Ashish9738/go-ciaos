@@ -1,80 +1,73 @@
-package ciaos
+package ciaos_test
 
 import (
-	"bytes"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/Ashish9738/go-ciaos"
 )
 
-type MockClient struct {
-	mock.Mock
-}
-
-func getTestConfig() Config {
-	return Config{
+func testConfig() *ciaos.Config {
+	return &ciaos.Config{
 		APIURL:        "http://test-api.com",
 		UserId:        "testuser",
 		UserAccessKey: "testaccesskey",
 	}
 }
 
-func (m *MockClient) Put(url string, headers map[string]string, body []byte) (*http.Response, error) {
-	args := m.Called(url, headers, body)
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func TestCiaosClient(t *testing.T) {
-	config := getTestConfig()
-
-	ciaosClient, err := Ciaos(config)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	assert.NotNil(t, ciaosClient)
-}
-
 func TestPutSuccess(t *testing.T) {
+	testData := []byte("test data")
 	tmpFile := "test.txt"
-	err := ioutil.WriteFile(tmpFile, []byte("test data"), 0644)
+
+	tmpFilePath := "./" + tmpFile
+	err := ioutil.WriteFile(tmpFilePath, testData, 0644)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to write to temporary file: %v", err)
 	}
-	defer func() {
-		err := os.Remove(tmpFile)
-		if err != nil {
-			t.Fatal(err)
+	defer os.Remove(tmpFilePath)
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fileName := filepath.Base(r.URL.Path)
+
+		if fileName != tmpFile {
+			t.Errorf("Unexpected file name in URL path: %s", fileName)
 		}
-	}()
 
-	mockClient := new(MockClient)
-	mockResponse := &http.Response{
-		StatusCode: 200,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Data uploaded successfully: key = test.txt"))),
-	}
-	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything).Return(mockResponse, nil)
+		expectedHeaders := "testuser"
+		if r.Header.Get("User") != expectedHeaders {
+			t.Errorf("Expected header User: %s, got: %s", expectedHeaders, r.Header.Get("User"))
+		}
 
-	headers := map[string]string{"User": "testuser"}
-	body := []byte("test data")
-	url := "/put/test.txt"
-	response, err := mockClient.Put(url, headers, body)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Data uploaded successfully: key = test.txt"))
+	}))
+	defer mockServer.Close()
 
+	cfg := testConfig()
+	cfg.APIURL = mockServer.URL
+	ciaos := cfg
+	fileName := filepath.Base(tmpFilePath)
+	response, err := ciaos.Put(fileName, tmpFilePath)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("Failed to perform PUT request: %v", err)
 	}
 
-	assert.Equal(t, 200, response.StatusCode)
-	respBody, err := ioutil.ReadAll(response.Body)
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected status code 200, got %d", response.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to read response body: %v", err)
 	}
+	defer response.Body.Close()
 
-	assert.Equal(t, "Data uploaded successfully: key = test.txt", string(respBody))
-	mockClient.AssertExpectations(t)
-
+	expectedResponse := "Data uploaded successfully: key = test.txt"
+	if string(body) != expectedResponse {
+		t.Errorf("Expected response: %s, got: %s", expectedResponse, string(body))
+	}
 }
