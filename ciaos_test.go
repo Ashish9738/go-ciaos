@@ -17,7 +17,6 @@ import (
 // testConfig returns a sample configuration for
 // testing purpose.This configuration includes
 // a mock APIURL, a test UserId and a test UserAccessKey.
-
 func testConfig() *ciaos.Config {
 	return &ciaos.Config{
 		APIURL:        "http://test-api.com",
